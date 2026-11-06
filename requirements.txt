@@ -1,0 +1,9 @@
+insightface==0.7.3
+onnxruntime
+opencv-python
+numpy
+scikit-learn
+pillow
+joblib
+matplotlib
+seaborn

@@ -1,0 +1,19 @@
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Local face-image data and generated model artifacts
+/dataset/
+/models/
+
+# Local environment and editor/OS files
+.env
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
