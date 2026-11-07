@@ -3,6 +3,9 @@ import cv2
 import time
 import threading
 
+import argparse
+import os
+
 from insightface.app import FaceAnalysis
 
 from recognition import FaceRecognizer
@@ -315,7 +318,7 @@ def recognition_worker(app, recognizer, db, session_id):
 # DISPLAY WORKER
 # --------------------------------------------------
 
-def display_worker():
+def display_worker(stop_file=None):
 
     global inference_time
 
@@ -325,6 +328,10 @@ def display_worker():
     while not stop_event.is_set():
 
         with lock:
+            
+            if stop_file and os.path.exists(stop_file):
+                stop_event.set()
+                break
 
             if latest_frame is None:
                 frame = None
@@ -512,7 +519,7 @@ def display_worker():
 # MAIN FUNCTION
 # --------------------------------------------------
 
-def main():
+def main(course_id=None, stop_file=None):
 
     db = AttendanceManager()
 
@@ -525,7 +532,36 @@ def main():
         app, recognizer = initialize_recognition()
 
         # Select course and start session
-        result = select_course_and_start(db)
+        if course_id is None:
+            result = select_course_and_start(db)
+
+        else:
+
+            selected_course = next(
+                (
+                    course for course in db.get_courses()
+                    if course["course_id"] == course_id
+                ),
+                None
+            )
+
+            if selected_course is None:
+                print("Invalid course ID.")
+                return
+
+            success, message, session_id = db.start_attendance(
+                course_id
+            )
+
+            print(message)
+
+            if not success:
+                return
+
+            result = (
+                session_id,
+                selected_course["course_name"]
+            )
 
         if result is None:
             return
@@ -579,7 +615,7 @@ def main():
         recognition_thread.start()
 
         # Display loop
-        display_worker()
+        display_worker(stop_file)
 
         # Stop worker threads
         stop_event.set()
@@ -636,4 +672,23 @@ def main():
 
 if __name__ == "__main__":
 
-    main()
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--course-id",
+        type=int,
+        required=True
+    )
+
+    parser.add_argument(
+        "--stop-file",
+        type=str,
+        required=True
+    )
+
+    args = parser.parse_args()
+
+    main(
+        course_id=args.course_id,
+        stop_file=args.stop_file
+    )
