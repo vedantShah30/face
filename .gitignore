@@ -10,6 +10,9 @@ env/
 # Local face-image data and generated model artifacts
 /dataset/
 /models/
+/attendance/
+/attendance.db
+/attendance.db-*
 
 # Local environment and editor/OS files
 .env
