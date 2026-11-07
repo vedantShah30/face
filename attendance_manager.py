@@ -962,7 +962,12 @@ class AttendanceManager:
             ORDER BY students.student_id
         """, (course_id,))
 
-        return cursor.fetchall()
+        columns = [description[0] for description in cursor.description]
+
+        return [
+            dict(zip(columns, row))
+            for row in cursor.fetchall()
+        ]
 
     # --------------------------------------------------
     # DAILY ATTENDANCE REPORT

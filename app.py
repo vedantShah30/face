@@ -298,7 +298,8 @@ with st.sidebar:
             "Students",
             "Schedules",
             "Live Attendance",
-            "Reports"
+            "Reports",
+            "Attendance Shortage"
         ],
         label_visibility="visible"
     )
@@ -1194,6 +1195,206 @@ elif selected_page == "Reports":
                         mime="text/csv",
                         use_container_width=True
                     )
+                    
+
+elif selected_page == "Attendance Shortage":
+
+    st.title("Attendance Shortage")
+    st.caption(
+        "Identify students whose attendance falls below "
+        "the selected course attendance requirement."
+    )
+
+    st.divider()
+
+    # --------------------------------------------------
+    # 1. GET AVAILABLE COURSES
+    # --------------------------------------------------
+
+    courses = db.get_courses()
+
+    if not courses:
+        st.warning("No courses are available.")
+
+    else:
+
+        # Course selection
+        course_options = {
+            course["course_name"]: course["course_id"]
+            for course in courses
+        }
+
+        selected_course = st.selectbox(
+            "Select Course",
+            options=list(course_options.keys()),
+            key="shortage_course"
+        )
+
+        course_id = course_options[selected_course]
+
+        st.divider()
+
+        # --------------------------------------------------
+        # 2. ATTENDANCE THRESHOLD SLIDER
+        # --------------------------------------------------
+
+        st.subheader("Set Attendance Threshold")
+
+        attendance_limit = st.slider(
+            "Minimum required attendance (%)",
+            min_value=0,
+            max_value=100,
+            value=75,
+            step=1,
+            format="%d%%",
+            key="shortage_attendance_limit"
+        )
+
+        st.caption(
+            f"Showing students with attendance below "
+            f"{attendance_limit}% in {selected_course}."
+        )
+
+        st.divider()
+
+        # --------------------------------------------------
+        # 3. FETCH ATTENDANCE DATA
+        # --------------------------------------------------
+
+        attendance_data = db.get_course_attendance_summary(
+            course_id
+        )
+
+        if not attendance_data:
+
+            st.info(
+                "No students are enrolled in this course."
+            )
+
+        else:
+
+            df = pd.DataFrame(attendance_data)
+
+            # Ensure attendance percentage is numeric
+            df["attendance_percentage"] = pd.to_numeric(
+                df["attendance_percentage"],
+                errors="coerce"
+            ).fillna(0)
+
+            # --------------------------------------------------
+            # 4. FILTER STUDENTS BELOW THE THRESHOLD
+            # --------------------------------------------------
+
+            shortage_df = df[
+                df["attendance_percentage"] < attendance_limit
+            ].copy()
+
+            shortage_df = shortage_df.sort_values(
+                by="attendance_percentage",
+                ascending=True
+            )
+
+            # --------------------------------------------------
+            # 5. DISPLAY SUMMARY METRICS
+            # --------------------------------------------------
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                st.metric(
+                    label="Total Students",
+                    value=len(df)
+                )
+
+            with col2:
+                st.metric(
+                    label="Students Below Limit",
+                    value=len(shortage_df)
+                )
+
+            with col3:
+
+                shortage_percentage = (
+                    len(shortage_df) / len(df) * 100
+                    if len(df) > 0 else 0
+                )
+
+                st.metric(
+                    label="Shortage Percentage",
+                    value=f"{shortage_percentage:.1f}%"
+                )
+
+            st.divider()
+
+            # --------------------------------------------------
+            # 6. DISPLAY SHORTAGE STUDENTS
+            # --------------------------------------------------
+
+            st.subheader(
+                "Students Below Attendance Limit"
+            )
+
+            if shortage_df.empty:
+
+                st.success(
+                    "No students are below the selected "
+                    "attendance limit."
+                )
+
+            else:
+
+                # Select columns matching your database method
+                display_columns = [
+                    "student_id",
+                    "name",
+                    "total_classes",
+                    "classes_attended",
+                    "attendance_percentage"
+                ]
+
+                result_df = shortage_df[
+                    display_columns
+                ].copy()
+
+                # Round attendance percentage
+                result_df["attendance_percentage"] = (
+                    result_df["attendance_percentage"].round(2)
+                )
+
+                # Rename columns for frontend display
+                result_df.columns = [
+                    "Student ID",
+                    "Student Name",
+                    "Total Classes",
+                    "Classes Attended",
+                    "Attendance (%)"
+                ]
+
+                # Display table
+                st.dataframe(
+                    result_df,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+                # --------------------------------------------------
+                # 7. DOWNLOAD SHORTAGE REPORT
+                # --------------------------------------------------
+
+                csv = result_df.to_csv(
+                    index=False
+                ).encode("utf-8")
+
+                st.download_button(
+                    label="Download Shortage Report",
+                    data=csv,
+                    file_name=(
+                        f"{selected_course}_attendance_shortage.csv"
+                    ),
+                    mime="text/csv",
+                    key="download_shortage_report"
+                )
+
 
 
 # ==========================================================
